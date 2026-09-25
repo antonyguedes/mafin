@@ -29,7 +29,8 @@ pub(super) fn YearSummary(month: RwSignal<YearMonth>, report: Signal<Option<TaxR
                     <tr>
                         <th class=TH>"Mês"</th>
                         <th class=format!("{TH} text-right")>"Vendas de ações"</th>
-                        <th class=format!("{TH} text-right")>"Resultado ações"</th>
+                        <th class=format!("{TH} text-right")>"Ações (comuns)"</th>
+                        <th class=format!("{TH} text-right")>"Day trade"</th>
                         <th class=format!("{TH} text-right")>"Resultado FIIs"</th>
                         <th class=format!("{TH} text-right")>"IR devido"</th>
                         <th class=format!("{TH} text-right")>"DARF"</th>
@@ -54,6 +55,7 @@ pub(super) fn YearSummary(month: RwSignal<YearMonth>, report: Signal<Option<TaxR
                                         {m.stock.exempt.then(|| view! { <span class="ml-1 text-xs text-brand-600">"isento"</span> })}
                                     </td>
                                     <td class=format!("{TD} tabular text-right")>{format_brl(m.stock.result.0)}</td>
+                                    <td class=format!("{TD} tabular text-right")>{format_brl(m.day_trade.result.0)}</td>
                                     <td class=format!("{TD} tabular text-right")>{format_brl(m.fii.result.0)}</td>
                                     <td class=format!("{TD} tabular text-right")>{format_brl(m.tax_due.0)}</td>
                                     <td class=format!("{TD} tabular text-right font-medium")>{format_brl(m.darf.0)}</td>

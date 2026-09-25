@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!\", asset_id, kind AS \"kind: PayoutKind\", date AS \"date: NaiveDate\",\n                  gross AS \"gross: Money\", withheld AS \"withheld: Money\"\n           FROM payouts ORDER BY date DESC, id DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "payouts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "asset_id",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "payouts",
+            "name": "asset_id"
+          }
+        }
+      },
+      {
+        "name": "kind: PayoutKind",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payouts",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "date: NaiveDate",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payouts",
+            "name": "date"
+          }
+        }
+      },
+      {
+        "name": "gross: Money",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payouts",
+            "name": "gross"
+          }
+        }
+      },
+      {
+        "name": "withheld: Money",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payouts",
+            "name": "withheld"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d40d13c9254bcb5cdfee30a42170a7ca69ebf0df1ac29f46bc744fe969faff72"
+}

@@ -43,6 +43,24 @@ impl YearMonth {
         }
     }
 
+    /// Os `n` meses terminando em `self`, do mais antigo para o mais recente.
+    pub fn last_n(self, n: usize) -> Vec<YearMonth> {
+        let mut months = Vec::with_capacity(n);
+        let mut m = self;
+        for _ in 0..n {
+            months.push(m);
+            m = m.prev();
+        }
+        months.reverse();
+        months
+    }
+
+    /// "Set/26", para eixos de gráfico.
+    pub fn short_label_pt(self) -> String {
+        let name = crate::format::MONTHS_PT.get(self.month.wrapping_sub(1) as usize).unwrap_or(&"?");
+        format!("{}/{:02}", &name[..3], self.year.rem_euclid(100))
+    }
+
     pub fn contains(self, date: NaiveDate) -> bool {
         Self::of(date) == self
     }
@@ -78,6 +96,13 @@ mod tests {
         assert_eq!(jan.label_pt(), "Janeiro de 2026");
         assert!(jan.contains(NaiveDate::from_ymd_opt(2026, 1, 31).unwrap()));
         assert!(!jan.contains(NaiveDate::from_ymd_opt(2026, 2, 1).unwrap()));
+    }
+
+    #[test]
+    fn last_n_and_short_label() {
+        let feb = YearMonth::new(2026, 2).unwrap();
+        let months: Vec<_> = feb.last_n(3).into_iter().map(YearMonth::short_label_pt).collect();
+        assert_eq!(months, ["Dez/25", "Jan/26", "Fev/26"]);
     }
 
     #[test]

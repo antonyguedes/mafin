@@ -66,12 +66,12 @@ pub async fn update(db: impl SqliteExecutor<'_>, id: i64, input: NewAsset) -> Ap
     .ok_or(AppError::not_found(ENTITY, id))
 }
 
-/// Falha com `Conflict` se o ativo possuir ordens (FK de `orders.asset_id`).
+/// Falha com `Conflict` se o ativo possuir ordens ou proventos (FKs de `orders`/`payouts`).
 pub async fn delete(db: impl SqliteExecutor<'_>, id: i64) -> AppResult<()> {
     let result = sqlx::query!("DELETE FROM assets WHERE id = ?", id)
         .execute(db)
         .await
-        .map_err(conflict_as("O ativo possui ordens registradas; exclua as ordens antes"))?;
+        .map_err(conflict_as("O ativo possui ordens ou proventos registrados; exclua-os antes"))?;
     if result.rows_affected() == 0 {
         return Err(AppError::not_found(ENTITY, id));
     }

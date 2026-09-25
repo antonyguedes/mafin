@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM monthly_irrf WHERE year = ? AND month = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "303cf6f3d67c1ae492875d77bd55723674caa1f665c9904117f0271e79335ee0"
+}

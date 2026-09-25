@@ -1,4 +1,5 @@
 pub mod allocation;
+pub mod chart;
 pub mod form;
 pub mod icons;
 pub mod layout;

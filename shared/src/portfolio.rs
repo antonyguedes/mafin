@@ -1,13 +1,20 @@
-//! Motor de posição: percorre as ordens em ordem cronológica e calcula, por ticker,
-//! quantidade, preço médio (PM) e custo; e, para cada venda, o resultado realizado.
+//! Motor de posição: percorre as ordens dia a dia e calcula, por ticker, quantidade, preço
+//! médio (PM) e custo; e, para cada venda, o resultado realizado (swing trade ou day trade).
 //!
 //! Regras (Receita Federal, renda variável):
 //! * O PM é consolidado por TICKER, somando todas as corretoras.
 //! * Compra: PM = ((Qtd ant. × PM ant.) + (Qtd nova × Preço + Taxas)) / (Qtd ant. + Qtd nova).
 //!   Implementado acumulando o custo total (`custo += qtd × preço + taxas`, `PM = custo / qtd`),
 //!   que é algebricamente a mesma fórmula e evita arredondar o PM a cada passo.
-//! * Venda: o PM não muda; resultado = qtd × preço − taxas − qtd × PM.
-//! * Ordens do mesmo dia seguem a ordem de cadastro (id). Day trade tem regra própria (Fase 6).
+//! * Venda comum (swing): o PM não muda; resultado = qtd × preço − taxas − qtd × PM.
+//! * **Day trade:** compra e venda do mesmo ativo na MESMA corretora no MESMO dia. A quantidade
+//!   de day trade é `min(comprado no dia, vendido no dia)`; seu custo é o preço médio das
+//!   compras do dia (com taxas), não o PM da carteira. As sobras seguem como swing: compra
+//!   excedente entra na posição; venda excedente sai da posição anterior pelo PM.
+//! * Ordens só têm data (sem hora). Num mesmo dia, primeiro se casa o day trade de cada
+//!   corretora, depois as compras restantes entram na posição e, por fim, as vendas restantes
+//!   saem dela. Assim uma compra numa corretora cobre uma venda na outra no mesmo dia.
+//! * As taxas de uma venda dividida entre day trade e swing são rateadas pela quantidade.
 //!
 //! Nada aqui arredonda: o arredondamento para centavos é feito só na exibição/apuração.
 
@@ -17,7 +24,7 @@ use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
-use crate::format::{format_date_br, format_decimal_br};
+use crate::format::{format_date_br, format_quantity};
 use crate::{Asset, AssetType, Money, Order, OrderKind, Quantity, ValidationError};
 
 /// Posição atual em um ticker (somente quantidade > 0).
@@ -33,23 +40,33 @@ pub struct Position {
     pub total_cost: Money,
 }
 
-/// Resultado realizado de uma ordem de venda.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SaleKind {
+    /// Operação comum: custo pelo PM da carteira.
+    Swing,
+    /// Compra e venda no mesmo dia e corretora: custo pelas compras do dia.
+    DayTrade,
+}
+
+/// Resultado realizado de (parte de) uma ordem de venda. Uma venda que é parcialmente day
+/// trade gera dois registros com o mesmo `order_id`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SaleResult {
     pub order_id: i64,
     pub ticker: String,
     pub asset_type: AssetType,
     pub date: NaiveDate,
+    pub kind: SaleKind,
     pub quantity: Quantity,
-    /// Quantidade × preço de venda (base do limite de isenção de R$ 20 mil).
+    /// Quantidade × preço de venda (base do limite de isenção de R$ 20 mil, no swing).
     pub gross: Money,
+    /// Parcela das taxas da ordem proporcional a `quantity`.
     pub fees: Money,
-    /// Quantidade × PM na data da venda.
+    /// Quantidade × PM (swing) ou × custo médio das compras do dia (day trade).
     pub cost: Money,
     /// gross − fees − cost. Negativo = prejuízo.
     pub result: Money,
-    /// Houve compra do mesmo ticker na mesma data (possível day trade, que tem regra própria).
-    pub day_trade: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -71,11 +88,40 @@ pub struct Portfolio {
     pub total_cost: Money,
 }
 
+impl Portfolio {
+    /// Resultado total de uma ordem de venda (somando as partes swing e day trade).
+    pub fn order_result(&self, order_id: i64) -> Option<Money> {
+        let parts: Vec<_> = self.sales.iter().filter(|s| s.order_id == order_id).collect();
+        (!parts.is_empty()).then(|| Money(parts.iter().map(|s| s.result.0).sum()))
+    }
+}
+
 #[derive(Default)]
 struct Book {
     quantity: Decimal,
     cost: Decimal,
     brokers: BTreeSet<String>,
+}
+
+/// Parte de uma ordem de venda ainda não casada, a ser baixada da posição (swing).
+struct PendingSell<'a> {
+    order: &'a Order,
+    asset: &'a Asset,
+    quantity: Decimal,
+    fees: Decimal,
+}
+
+fn oversell(asset: &Asset, date: NaiveDate, qty: Decimal, position: Decimal) -> ValidationError {
+    ValidationError::new(
+        "quantity",
+        &format!(
+            "Venda de {} {} em {} excede a posição de {}",
+            format_quantity(qty),
+            asset.ticker,
+            format_date_br(date),
+            format_quantity(position),
+        ),
+    )
 }
 
 /// Calcula a carteira. Falha se os dados forem inconsistentes: venda maior que a posição,
@@ -87,11 +133,7 @@ pub fn build_portfolio(assets: &[Asset], orders: &[Order]) -> Result<Portfolio, 
             Some(previous) if previous != asset.asset_type => {
                 return Err(ValidationError::new(
                     "asset_type",
-                    &format!(
-                        "{} já está cadastrado como {} em outra corretora",
-                        asset.ticker,
-                        previous.label_pt()
-                    ),
+                    &format!("{} já está cadastrado como {} em outra corretora", asset.ticker, previous.label_pt()),
                 ));
             }
             _ => {}
@@ -99,73 +141,104 @@ pub fn build_portfolio(assets: &[Asset], orders: &[Order]) -> Result<Portfolio, 
     }
 
     let assets_by_id: HashMap<i64, &Asset> = assets.iter().map(|a| (a.id, a)).collect();
-    let mut chronological: Vec<&Order> = orders.iter().collect();
-    chronological.sort_by_key(|o| (o.date, o.id));
-
-    // (ticker, data) com alguma compra: uma venda nesse par é possível day trade.
-    let buy_days: BTreeSet<(&str, NaiveDate)> = orders
-        .iter()
-        .filter(|o| o.kind == OrderKind::Buy)
-        .filter_map(|o| assets_by_id.get(&o.asset_id).map(|a| (a.ticker.as_str(), o.date)))
-        .collect();
-
-    let mut books: BTreeMap<&str, Book> = BTreeMap::new();
-    let mut sales = Vec::new();
-
-    for order in chronological {
-        let asset = assets_by_id.get(&order.asset_id).ok_or_else(|| {
+    let asset_of = |order: &Order| {
+        assets_by_id.get(&order.asset_id).copied().ok_or_else(|| {
             ValidationError::new("asset_id", &format!("Ordem #{} aponta para um ativo inexistente", order.id))
-        })?;
-        let qty = order.quantity.0;
+        })
+    };
 
-        if asset.asset_type != AssetType::FixedIncome && !qty.fract().is_zero() {
+    // Dia -> ativo (ticker + corretora) -> ordens do dia em ordem de cadastro.
+    let mut days: BTreeMap<NaiveDate, BTreeMap<i64, Vec<&Order>>> = BTreeMap::new();
+    for order in orders {
+        let asset = asset_of(order)?;
+        if asset.asset_type != AssetType::FixedIncome && !order.quantity.fract().is_zero() {
             return Err(ValidationError::new(
                 "quantity",
                 &format!("{} ({}) só aceita quantidades inteiras", asset.ticker, asset.asset_type.label_pt()),
             ));
         }
+        days.entry(order.date).or_default().entry(order.asset_id).or_default().push(order);
+    }
 
-        let book = books.entry(&asset.ticker).or_default();
-        book.brokers.insert(asset.broker.clone());
+    let mut books: BTreeMap<&str, Book> = BTreeMap::new();
+    let mut sales = Vec::new();
 
-        match order.kind {
-            OrderKind::Buy => {
-                book.cost += qty * order.price.0 + order.fees.0;
-                book.quantity += qty;
+    for (date, by_asset) in days {
+        let mut pending_sells: Vec<PendingSell> = Vec::new();
+
+        for (_, mut day_orders) in by_asset {
+            day_orders.sort_by_key(|o| o.id);
+            let asset = asset_of(day_orders[0])?;
+            let book = books.entry(&asset.ticker).or_default();
+            book.brokers.insert(asset.broker.clone());
+
+            let buys: Vec<&Order> = day_orders.iter().copied().filter(|o| o.kind == OrderKind::Buy).collect();
+            let bought: Decimal = buys.iter().map(|o| o.quantity.0).sum();
+            let buy_cost: Decimal = buys.iter().map(|o| o.quantity.0 * o.price.0 + o.fees.0).sum();
+            let sold: Decimal = day_orders.iter().filter(|o| o.kind == OrderKind::Sell).map(|o| o.quantity.0).sum();
+
+            // Casa o day trade nas vendas, em ordem de cadastro.
+            let day_trade_qty = bought.min(sold);
+            let mut to_match = day_trade_qty;
+            for sell in day_orders.iter().copied().filter(|o| o.kind == OrderKind::Sell) {
+                let qty = sell.quantity.0;
+                let matched = to_match.min(qty);
+                to_match -= matched;
+                // Rateio das taxas; a parte swing recebe o restante (a soma fecha exata).
+                let dt_fees = if matched == qty { sell.fees.0 } else { sell.fees.0 * matched / qty };
+                if matched > Decimal::ZERO {
+                    let cost = buy_cost * matched / bought;
+                    let gross = matched * sell.price.0;
+                    sales.push(SaleResult {
+                        order_id: sell.id,
+                        ticker: asset.ticker.clone(),
+                        asset_type: asset.asset_type,
+                        date,
+                        kind: SaleKind::DayTrade,
+                        quantity: Quantity(matched),
+                        gross: Money(gross),
+                        fees: Money(dt_fees),
+                        cost: Money(cost),
+                        result: Money(gross - dt_fees - cost),
+                    });
+                }
+                if matched < qty {
+                    pending_sells.push(PendingSell { order: sell, asset, quantity: qty - matched, fees: sell.fees.0 - dt_fees });
+                }
             }
-            OrderKind::Sell => {
-                if qty > book.quantity {
-                    return Err(ValidationError::new(
-                        "quantity",
-                        &format!(
-                            "Venda de {} {} em {} excede a posição de {}",
-                            format_decimal_br(qty.normalize(), qty.normalize().scale()),
-                            asset.ticker,
-                            format_date_br(order.date),
-                            format_decimal_br(book.quantity.normalize(), book.quantity.normalize().scale()),
-                        ),
-                    ));
-                }
-                // Custo proporcional = qtd × PM, sem materializar o PM arredondado.
-                let cost = if qty == book.quantity { book.cost } else { book.cost * qty / book.quantity };
-                let gross = qty * order.price.0;
-                sales.push(SaleResult {
-                    order_id: order.id,
-                    ticker: asset.ticker.clone(),
-                    asset_type: asset.asset_type,
-                    date: order.date,
-                    quantity: order.quantity,
-                    gross: Money(gross),
-                    fees: order.fees,
-                    cost: Money(cost),
-                    result: Money(gross - order.fees.0 - cost),
-                    day_trade: buy_days.contains(&(asset.ticker.as_str(), order.date)),
-                });
-                book.cost -= cost;
-                book.quantity -= qty;
-                if book.quantity.is_zero() {
-                    book.cost = Decimal::ZERO;
-                }
+
+            // Compras excedentes entram na posição com sua parte do custo.
+            let remaining = bought - day_trade_qty;
+            if remaining > Decimal::ZERO {
+                book.cost += if day_trade_qty.is_zero() { buy_cost } else { buy_cost * remaining / bought };
+                book.quantity += remaining;
+            }
+        }
+
+        // Vendas comuns saem da posição (já incluindo as compras do dia), pelo PM.
+        for sell in pending_sells {
+            let book = books.get_mut(sell.asset.ticker.as_str()).expect("livro criado acima");
+            if sell.quantity > book.quantity {
+                return Err(oversell(sell.asset, date, sell.quantity, book.quantity));
+            }
+            let cost = if sell.quantity == book.quantity { book.cost } else { book.cost * sell.quantity / book.quantity };
+            let gross = sell.quantity * sell.order.price.0;
+            sales.push(SaleResult {
+                order_id: sell.order.id,
+                ticker: sell.asset.ticker.clone(),
+                asset_type: sell.asset.asset_type,
+                date,
+                kind: SaleKind::Swing,
+                quantity: Quantity(sell.quantity),
+                gross: Money(gross),
+                fees: Money(sell.fees),
+                cost: Money(cost),
+                result: Money(gross - sell.fees - cost),
+            });
+            book.cost -= cost;
+            book.quantity -= sell.quantity;
+            if book.quantity.is_zero() {
+                book.cost = Decimal::ZERO;
             }
         }
     }
@@ -298,16 +371,75 @@ mod tests {
     }
 
     #[test]
-    fn flags_same_day_buy_and_sell() {
+    fn same_day_same_broker_is_day_trade_with_own_cost() {
         let assets = [asset(1, "PETR4", AssetType::Stock, "XP")];
         let orders = [
-            order(1, 1, Buy, dec!(100), dec!(10), dec!(0), 1),
-            order(2, 1, Sell, dec!(50), dec!(11), dec!(0), 2),
-            order(3, 1, Buy, dec!(10), dec!(10), dec!(0), 3),
-            order(4, 1, Sell, dec!(10), dec!(12), dec!(0), 3),
+            order(1, 1, Buy, dec!(100), dec!(10), dec!(0), 1), // posição anterior, PM 10
+            order(2, 1, Buy, dec!(50), dec!(20), dec!(10), 2), // dia 2: custo do dia 20,20/un.
+            order(3, 1, Sell, dec!(50), dec!(21), dec!(5), 2),
         ];
         let p = build_portfolio(&assets, &orders).unwrap();
-        assert_eq!(p.sales.iter().map(|s| s.day_trade).collect::<Vec<_>>(), [false, true]);
+        assert_eq!(p.sales.len(), 1);
+        let dt = &p.sales[0];
+        assert_eq!(dt.kind, SaleKind::DayTrade);
+        assert_eq!(dt.cost, Money(dec!(1010))); // 50 × 20 + 10, e não 50 × PM
+        assert_eq!(dt.result, Money(dec!(35))); // 1.050 − 5 − 1.010
+        // A posição anterior fica intacta.
+        assert_eq!(p.positions[0].quantity, Quantity(dec!(100)));
+        assert_eq!(p.positions[0].average_price, Money(dec!(10)));
+    }
+
+    #[test]
+    fn day_trade_leftovers_go_to_swing() {
+        let assets = [asset(1, "PETR4", AssetType::Stock, "XP")];
+        // Compra 100, vende 30 no mesmo dia: 30 day trade, 70 entram na posição.
+        let orders = [order(1, 1, Buy, dec!(100), dec!(10), dec!(10), 1), order(2, 1, Sell, dec!(30), dec!(12), dec!(0), 1)];
+        let p = build_portfolio(&assets, &orders).unwrap();
+        assert_eq!(p.sales[0].cost, Money(dec!(303))); // 30 × 10,10
+        assert_eq!(p.positions[0].quantity, Quantity(dec!(70)));
+        assert_eq!(p.positions[0].total_cost, Money(dec!(707))); // 70 × 10,10
+
+        // Posição de 100 a PM 10; no dia compra 20 e vende 50: 20 day trade + 30 swing.
+        let orders = [
+            order(1, 1, Buy, dec!(100), dec!(10), dec!(0), 1),
+            order(2, 1, Buy, dec!(20), dec!(15), dec!(0), 2),
+            order(3, 1, Sell, dec!(50), dec!(16), dec!(10), 2),
+        ];
+        let p = build_portfolio(&assets, &orders).unwrap();
+        let parts: Vec<_> = p.sales.iter().map(|s| (s.kind, s.quantity.0, s.fees.0, s.result.0)).collect();
+        assert_eq!(
+            parts,
+            [
+                (SaleKind::DayTrade, dec!(20), dec!(4), dec!(16)), // 320 − 4 − 300
+                (SaleKind::Swing, dec!(30), dec!(6), dec!(174)),   // 480 − 6 − 300
+            ]
+        );
+        assert_eq!(p.order_result(3), Some(Money(dec!(190))));
+        assert_eq!(p.positions[0].quantity, Quantity(dec!(70)));
+        assert_eq!(p.positions[0].average_price, Money(dec!(10)));
+    }
+
+    #[test]
+    fn different_brokers_same_day_is_not_day_trade() {
+        let assets = [asset(1, "PETR4", AssetType::Stock, "XP"), asset(2, "PETR4", AssetType::Stock, "Rico")];
+        let orders = [
+            order(1, 1, Buy, dec!(100), dec!(10), dec!(0), 1),
+            order(2, 2, Buy, dec!(100), dec!(20), dec!(0), 2),
+            order(3, 1, Sell, dec!(100), dec!(25), dec!(0), 2),
+        ];
+        let p = build_portfolio(&assets, &orders).unwrap();
+        assert_eq!(p.sales[0].kind, SaleKind::Swing);
+        // A compra do dia (outra corretora) entra no PM antes da venda: PM 15.
+        assert_eq!(p.sales[0].cost, Money(dec!(1500)));
+    }
+
+    #[test]
+    fn same_day_buy_covers_sell_without_prior_position() {
+        // Antes ordens do mesmo dia seguiam o id: venda cadastrada antes da compra falhava.
+        let assets = [asset(1, "PETR4", AssetType::Stock, "XP")];
+        let orders = [order(1, 1, Sell, dec!(10), dec!(12), dec!(0), 5), order(2, 1, Buy, dec!(10), dec!(10), dec!(0), 5)];
+        let p = build_portfolio(&assets, &orders).unwrap();
+        assert_eq!((p.sales[0].kind, p.sales[0].result), (SaleKind::DayTrade, Money(dec!(20))));
     }
 
     #[test]

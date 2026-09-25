@@ -78,7 +78,10 @@ pub const ROW_ACTION: &str = "rounded-md px-2 py-1 text-xs font-medium transitio
 /// Exclusão em dois cliques ("Excluir" → "Confirmar"), sem diálogos nativos
 /// (que não são confiáveis em todas as plataformas do Tauri).
 #[component]
-pub fn DeleteButton(#[prop(into)] on_confirm: Callback<()>) -> impl IntoView {
+pub fn DeleteButton(
+    #[prop(into)] on_confirm: Callback<()>,
+    #[prop(default = "Excluir")] label: &'static str,
+) -> impl IntoView {
     let confirming = RwSignal::new(false);
     view! {
         <button
@@ -100,7 +103,7 @@ pub fn DeleteButton(#[prop(into)] on_confirm: Callback<()>) -> impl IntoView {
             }
             on:blur=move |_| confirming.set(false)
         >
-            {move || if confirming.get() { "Confirmar" } else { "Excluir" }}
+            {move || if confirming.get() { "Confirmar" } else { label }}
         </button>
     }
 }

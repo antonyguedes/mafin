@@ -1,7 +1,7 @@
 //! Utilitários do navegador.
 
 use shared::YearMonth;
-use shared::chrono::NaiveDate;
+use shared::chrono::{Datelike, NaiveDate};
 
 /// Data local de hoje, lida do relógio do navegador (o chrono no Wasm não tem relógio).
 pub fn today() -> NaiveDate {
@@ -12,4 +12,8 @@ pub fn today() -> NaiveDate {
 
 pub fn current_month() -> YearMonth {
     YearMonth::of(today())
+}
+
+pub fn current_year() -> i32 {
+    today().year()
 }

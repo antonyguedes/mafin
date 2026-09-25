@@ -4,11 +4,13 @@ mod form;
 mod table;
 
 use leptos::prelude::*;
-use shared::format::format_brl;
-use shared::{Transaction, TransactionFilter, TransactionKind, TransactionSummary, YearMonth};
+use shared::format::{format_brl, format_percent};
+use shared::rust_decimal::Decimal;
+use shared::{Transaction, TransactionFilter, TransactionKind, TransactionSummary, YearMonth, expenses_by_category};
 
 use crate::components::month_picker::MonthPicker;
-use crate::components::page::{PageHeader, StatCard};
+use crate::components::chart::{DonutWithLegend, PALETTE, PieSlice};
+use crate::components::page::{Card, PageHeader, StatCard};
 use crate::ipc;
 use crate::util::current_month;
 use form::TransactionForm;
@@ -109,5 +111,39 @@ pub fn Expenses() -> impl IntoView {
             loading=Signal::derive(move || loaded.get().is_none())
             load_error
         />
+
+        <Card class="mt-6">
+            <h2 class="mb-4 text-sm font-semibold">"Despesas por categoria"</h2>
+            <ExpensesByCategory rows=all_rows />
+        </Card>
+    }
+}
+
+/// Rosca das despesas por categoria (até 8 fatias; o resto vira "Outros").
+#[component]
+pub(crate) fn ExpensesByCategory(#[prop(into)] rows: Signal<Vec<Transaction>>) -> impl IntoView {
+    let slices = Signal::derive(move || {
+        rows.with(|rows| {
+            let groups = expenses_by_category(rows, PALETTE.len());
+            let total: Decimal = groups.iter().map(|(_, m)| m.0).sum();
+            groups
+                .into_iter()
+                .enumerate()
+                .map(|(i, (label, amount))| PieSlice {
+                    label,
+                    value: amount.0.to_string(),
+                    caption: format!("{} · {}", format_brl(amount.0), format_percent(amount.0 / total * Decimal::ONE_HUNDRED)),
+                    color: PALETTE[i % PALETTE.len()].into(),
+                })
+                .collect::<Vec<_>>()
+        })
+    });
+    view! {
+        <Show
+            when=move || !slices.with(Vec::is_empty)
+            fallback=|| view! { <p class="text-sm text-slate-500">"Nenhuma despesa no período."</p> }
+        >
+            <DonutWithLegend slices label="Despesas por categoria" />
+        </Show>
     }
 }

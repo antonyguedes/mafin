@@ -4,9 +4,12 @@
 //! [`Quantity`]), nunca `f32`/`f64`.
 
 mod asset;
+pub mod calendar;
 mod decimal;
 pub mod format;
+pub mod import;
 mod order;
+pub mod payout;
 mod period;
 mod portfolio;
 pub mod tax;
@@ -16,9 +19,13 @@ mod validation;
 pub use asset::{Asset, AssetType, NewAsset};
 pub use decimal::{Money, ParseDecimalError, Quantity};
 pub use order::{NewOrder, Order, OrderFilter, OrderKind};
+pub use payout::{NewPayout, Payout, PayoutKind};
 pub use period::YearMonth;
-pub use portfolio::{AllocationSlice, Portfolio, Position, SaleResult, build_portfolio};
-pub use transaction::{NewTransaction, Transaction, TransactionFilter, TransactionKind, TransactionSummary};
+pub use portfolio::{AllocationSlice, Portfolio, Position, SaleKind, SaleResult, build_portfolio};
+pub use transaction::{
+    NewTransaction, Transaction, TransactionFilter, TransactionKind, TransactionSummary, expenses_by_category,
+    monthly_summaries,
+};
 pub use validation::ValidationError;
 
 pub use chrono;
@@ -51,8 +58,19 @@ pub mod commands {
     pub const UPDATE_ORDER: &str = "update_order";
     pub const DELETE_ORDER: &str = "delete_order";
 
+    pub const CREATE_PAYOUT: &str = "create_payout";
+    pub const LIST_PAYOUTS: &str = "list_payouts";
+    pub const UPDATE_PAYOUT: &str = "update_payout";
+    pub const DELETE_PAYOUT: &str = "delete_payout";
+
+    pub const PARSE_BROKER_NOTE: &str = "parse_broker_note";
+    pub const IMPORT_BROKER_NOTES: &str = "import_broker_notes";
+    pub const LIST_IMPORTED_NOTES: &str = "list_imported_notes";
+    pub const UNDO_IMPORTED_NOTE: &str = "undo_imported_note";
+
     pub const GET_PORTFOLIO: &str = "get_portfolio";
     pub const GET_TAX_REPORT: &str = "get_tax_report";
+    pub const SET_MONTHLY_IRRF: &str = "set_monthly_irrf";
 }
 
 /// Payload de teste do IPC (frontend -> backend).

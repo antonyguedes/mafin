@@ -1,36 +1,43 @@
-//! Carteira: custódia atual, ordens de compra/venda e cadastro de ativos.
+//! Carteira: custódia atual, ordens de compra/venda, proventos e cadastro de ativos.
 
 mod assets;
 mod custody;
+mod import;
 mod orders;
+mod payouts;
 
 use leptos::prelude::*;
-use shared::{Asset, Order, Portfolio};
+use shared::{Asset, Order, Payout, Portfolio};
 
 use crate::components::form::{SegmentOption, Segmented};
 use crate::components::page::PageHeader;
 use crate::ipc;
 use assets::AssetsTab;
 use custody::CustodyTab;
+use import::ImportTab;
 use orders::OrdersTab;
+use payouts::PayoutsTab;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Tab {
     Custody,
     Orders,
+    Payouts,
     Assets,
+    Import,
 }
 
 /// Estado compartilhado entre as abas. `Copy`: só contém signals/recursos.
 #[derive(Clone, Copy)]
 pub(crate) struct PortfolioState {
     pub tab: RwSignal<Tab>,
-    /// Incrementado após qualquer escrita, para recarregar ativos, ordens e custódia.
+    /// Incrementado após qualquer escrita, para recarregar ativos, ordens, proventos e custódia.
     pub version: RwSignal<u32>,
     pub assets: Signal<Vec<Asset>>,
     pub orders: Signal<Vec<Order>>,
+    pub payouts: Signal<Vec<Payout>>,
     pub portfolio: Signal<Option<Portfolio>>,
-    /// Erro de carga de qualquer um dos três recursos.
+    /// Erro de carga de qualquer um dos recursos.
     pub load_error: Signal<Option<String>>,
     pub loading: Signal<bool>,
 }
@@ -56,6 +63,10 @@ pub fn Portfolio() -> impl IntoView {
         version.track();
         ipc::list_orders()
     });
+    let payouts_res = LocalResource::new(move || {
+        version.track();
+        ipc::list_payouts()
+    });
     let portfolio_res = LocalResource::new(move || {
         version.track();
         ipc::get_portfolio()
@@ -66,9 +77,15 @@ pub fn Portfolio() -> impl IntoView {
         version,
         assets: Signal::derive(move || assets_res.get().and_then(Result::ok).unwrap_or_default()),
         orders: Signal::derive(move || orders_res.get().and_then(Result::ok).unwrap_or_default()),
+        payouts: Signal::derive(move || payouts_res.get().and_then(Result::ok).unwrap_or_default()),
         portfolio: Signal::derive(move || portfolio_res.get().and_then(Result::ok)),
         load_error: Signal::derive(move || {
-            [assets_res.get().and_then(Result::err), orders_res.get().and_then(Result::err), portfolio_res.get().and_then(Result::err)]
+            [
+                assets_res.get().and_then(Result::err),
+                orders_res.get().and_then(Result::err),
+                payouts_res.get().and_then(Result::err),
+                portfolio_res.get().and_then(Result::err),
+            ]
                 .into_iter()
                 .flatten()
                 .next()
@@ -77,14 +94,16 @@ pub fn Portfolio() -> impl IntoView {
     };
 
     view! {
-        <PageHeader title="Carteira" subtitle="Custódia a preço médio, ordens de compra/venda e ativos.">
+        <PageHeader title="Carteira" subtitle="Custódia a preço médio, ordens, proventos e ativos.">
             <Segmented
                 value=state.tab
-                class="w-80"
+                class="w-[34rem]"
                 options=vec![
                     SegmentOption::new(Tab::Custody, "Custódia"),
                     SegmentOption::new(Tab::Orders, "Ordens"),
+                    SegmentOption::new(Tab::Payouts, "Proventos"),
                     SegmentOption::new(Tab::Assets, "Ativos"),
+                    SegmentOption::new(Tab::Import, "Importar notas"),
                 ]
             />
         </PageHeader>
@@ -92,7 +111,9 @@ pub fn Portfolio() -> impl IntoView {
         {move || match state.tab.get() {
             Tab::Custody => view! { <CustodyTab state /> }.into_any(),
             Tab::Orders => view! { <OrdersTab state /> }.into_any(),
+            Tab::Payouts => view! { <PayoutsTab state /> }.into_any(),
             Tab::Assets => view! { <AssetsTab state /> }.into_any(),
+            Tab::Import => view! { <ImportTab state /> }.into_any(),
         }}
     }
 }

@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT year AS \"year!\", month AS \"month!\", amount AS \"amount: Money\" FROM monthly_irrf",
+  "describe": {
+    "columns": [
+      {
+        "name": "year!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "monthly_irrf",
+            "name": "year"
+          }
+        }
+      },
+      {
+        "name": "month!",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "monthly_irrf",
+            "name": "month"
+          }
+        }
+      },
+      {
+        "name": "amount: Money",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "monthly_irrf",
+            "name": "amount"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "36c56359266dabd84908bef98e30c7ef951213363b09e4c63375d8959b25cff6"
+}

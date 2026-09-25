@@ -9,11 +9,11 @@
 //! toda uma classe de bugs de atualização incremental.
 
 use shared::tax::{TaxReport, tax_report};
-use shared::{Asset, NewAsset, NewOrder, Order, OrderFilter, Portfolio, build_portfolio};
+use shared::{Asset, NewAsset, NewOrder, Order, OrderFilter, PayoutKind, Portfolio, ValidationError, build_portfolio};
 use sqlx::{SqliteConnection, SqlitePool};
 
 use crate::error::{AppError, AppResult};
-use crate::repo::{assets, orders};
+use crate::repo::{assets, irrf, orders, payouts};
 
 async fn compute(db: &mut SqliteConnection) -> AppResult<Portfolio> {
     let assets = assets::list(&mut *db).await?;
@@ -21,14 +21,23 @@ async fn compute(db: &mut SqliteConnection) -> AppResult<Portfolio> {
     Ok(build_portfolio(&assets, &orders)?)
 }
 
+/// Recalcula a carteira dentro de uma transação em andamento e falha (com contexto) se ela
+/// ficou inconsistente. Usado por escritas em lote, como a importação de notas.
+pub async fn validate(db: &mut SqliteConnection, context: Option<&str>) -> AppResult<()> {
+    compute(db).await.map(|_| ()).map_err(|e| with_context(e, context))
+}
+
 pub async fn portfolio(pool: &SqlitePool) -> AppResult<Portfolio> {
     let mut conn = pool.acquire().await?;
     compute(&mut conn).await
 }
 
-/// Apuração mensal de IR, derivada dos resultados de venda da carteira.
+/// Apuração mensal de IR: resultados de venda da carteira + IRRF informado por mês.
 pub async fn tax(pool: &SqlitePool) -> AppResult<TaxReport> {
-    Ok(tax_report(&portfolio(pool).await?.sales))
+    let mut conn = pool.acquire().await?;
+    let portfolio = compute(&mut conn).await?;
+    let irrf = irrf::all(&mut *conn).await?;
+    Ok(tax_report(&portfolio.sales, &irrf))
 }
 
 /// Explica por que uma edição/exclusão foi recusada: o erro do motor fala da venda
@@ -73,9 +82,27 @@ pub async fn create_asset(pool: &SqlitePool, input: NewAsset) -> AppResult<Asset
     checked!(pool, None, |db| assets::create(db, input))
 }
 
-/// Trocar ticker ou tipo muda como as ordens do ativo são consolidadas.
+/// Trocar ticker ou tipo muda como as ordens do ativo são consolidadas; trocar o tipo
+/// também precisa manter os proventos compatíveis (ex.: JCP só em ações).
 pub async fn update_asset(pool: &SqlitePool, id: i64, input: NewAsset) -> AppResult<Asset> {
-    checked!(pool, Some("Esta alteração"), |db| assets::update(db, id, input))
+    let mut tx = pool.begin().await?;
+    let asset = assets::update(&mut *tx, id, input).await?;
+    compute(&mut tx).await.map_err(|e| with_context(e, Some("Esta alteração")))?;
+    for payout in payouts::list(&mut *tx).await?.iter().filter(|p| p.asset_id == id) {
+        if !PayoutKind::allowed_for(asset.asset_type).contains(&payout.kind) {
+            return Err(AppError::Validation(ValidationError::new(
+                "asset_type",
+                &format!(
+                    "{} tem proventos do tipo {}, que não se aplicam a {}",
+                    asset.ticker,
+                    payout.kind.label_pt(),
+                    asset.asset_type.label_pt()
+                ),
+            )));
+        }
+    }
+    tx.commit().await?;
+    Ok(asset)
 }
 
 #[cfg(test)]
@@ -162,6 +189,29 @@ mod tests {
         assert_eq!(m.stock.result, Money(dec!(1480)));
         assert_eq!(m.stock.tax, Money(dec!(222))); // 15% de 1.480
         assert_eq!(m.darf, Money(dec!(222)));
+    }
+
+    #[tokio::test]
+    async fn changing_asset_type_keeps_payouts_consistent() {
+        let pool = connect_in_memory().await;
+        let petr = create_asset(&pool, new_asset("PETR4", AssetType::Stock, "XP")).await.unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        payouts::create(
+            &mut conn,
+            shared::NewPayout {
+                asset_id: petr.id,
+                kind: PayoutKind::Jcp,
+                date: NaiveDate::from_ymd_opt(2026, 9, 1).unwrap(),
+                gross: Money(dec!(100)),
+                withheld: Money(dec!(15)),
+            },
+        )
+        .await
+        .unwrap();
+        drop(conn);
+        let err = update_asset(&pool, petr.id, new_asset("PETR4", AssetType::Fii, "XP")).await.unwrap_err();
+        assert!(err.to_string().contains("JCP"), "{err}");
+        assert_eq!(assets::get(&pool, petr.id).await.unwrap().asset_type, AssetType::Stock);
     }
 
     #[tokio::test]

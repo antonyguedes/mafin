@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO payouts (asset_id, kind, date, gross, withheld)\n           VALUES (?, ?, ?, ?, ?)\n           RETURNING id AS \"id!\", asset_id, kind AS \"kind: PayoutKind\", date AS \"date: NaiveDate\",\n                     gross AS \"gross: Money\", withheld AS \"withheld: Money\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "payouts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "asset_id",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "payouts",
+            "name": "asset_id"
+          }
+        }
+      },
+      {
+        "name": "kind: PayoutKind",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payouts",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "date: NaiveDate",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payouts",
+            "name": "date"
+          }
+        }
+      },
+      {
+        "name": "gross: Money",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payouts",
+            "name": "gross"
+          }
+        }
+      },
+      {
+        "name": "withheld: Money",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "payouts",
+            "name": "withheld"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      null,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8f4c0313f0c83c075161db13b8d9781ab7837688a9b1eb2ec7a60a81b5c28882"
+}

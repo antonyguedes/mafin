@@ -1,0 +1,15 @@
+{
+  "name": "mafin-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Testes E2E da interface (Chrome headless + backend Tauri falso).",
+  "scripts": {
+    "build": "cd ../frontend && trunk build",
+    "fixture": "cargo run -q -p shared --example tax_fixture -- fixtures/tax.json && cargo run -q -p mafin --features test-support --example note_fixture -- fixtures/nota.pdf fixtures/nota.json 123",
+    "test": "npm run build && npm run fixture && node run.mjs",
+    "test:only": "node run.mjs"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.12.0"
+  }
+}

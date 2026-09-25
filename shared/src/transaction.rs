@@ -88,6 +88,33 @@ impl TransactionSummary {
     }
 }
 
+/// Despesas agrupadas por categoria, da maior para a menor. Categorias que diferem só em
+/// maiúsculas/minúsculas são somadas (mantém a grafia da primeira ocorrência). Se houver mais
+/// de `max` categorias, as menores são somadas em "Outros".
+pub fn expenses_by_category(transactions: &[Transaction], max: usize) -> Vec<(String, Money)> {
+    let mut totals: Vec<(String, Money)> = Vec::new();
+    for tx in transactions.iter().filter(|t| t.kind == TransactionKind::Expense) {
+        match totals.iter_mut().find(|(c, _)| c.to_lowercase() == tx.category.to_lowercase()) {
+            Some((_, total)) => total.0 += tx.amount.0,
+            None => totals.push((tx.category.clone(), tx.amount)),
+        }
+    }
+    totals.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    if totals.len() > max && max > 0 {
+        let rest: rust_decimal::Decimal = totals.drain(max - 1..).map(|(_, m)| m.0).sum();
+        totals.push(("Outros".into(), Money(rest)));
+    }
+    totals
+}
+
+/// Resumo de cada mês em `months` (meses sem lançamentos ficam zerados).
+pub fn monthly_summaries(transactions: &[Transaction], months: &[YearMonth]) -> Vec<(YearMonth, TransactionSummary)> {
+    months
+        .iter()
+        .map(|&m| (m, TransactionSummary::of(transactions.iter().filter(|t| m.contains(t.date)))))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -143,6 +170,51 @@ mod tests {
         assert_eq!(summary.income, Money(dec!(0.3)));
         assert_eq!(summary.balance(), Money::ZERO);
         assert_eq!(summary.count, 3);
+    }
+
+    fn tx(kind: TransactionKind, amount: rust_decimal::Decimal, category: &str, (m, d): (u32, u32)) -> Transaction {
+        Transaction {
+            id: 0,
+            kind,
+            amount: Money(amount),
+            date: NaiveDate::from_ymd_opt(2026, m, d).unwrap(),
+            category: category.into(),
+            description: None,
+        }
+    }
+
+    #[test]
+    fn groups_expenses_by_category() {
+        use TransactionKind::{Expense, Income};
+        let rows = [
+            tx(Expense, dec!(100), "Mercado", (9, 1)),
+            tx(Expense, dec!(50.5), "mercado", (9, 2)),
+            tx(Expense, dec!(2000), "Moradia", (9, 3)),
+            tx(Income, dec!(9999), "Salário", (9, 4)),
+            tx(Expense, dec!(10), "Lazer", (9, 5)),
+            tx(Expense, dec!(5), "Café", (9, 6)),
+        ];
+        assert_eq!(
+            expenses_by_category(&rows, 10),
+            [
+                ("Moradia".into(), Money(dec!(2000))),
+                ("Mercado".into(), Money(dec!(150.5))),
+                ("Lazer".into(), Money(dec!(10))),
+                ("Café".into(), Money(dec!(5))),
+            ]
+        );
+        let top = expenses_by_category(&rows, 3);
+        assert_eq!(top[2], ("Outros".into(), Money(dec!(15))));
+        assert_eq!(top.len(), 3);
+    }
+
+    #[test]
+    fn summaries_per_month_including_empty() {
+        use TransactionKind::{Expense, Income};
+        let rows = [tx(Income, dec!(100), "x", (8, 1)), tx(Expense, dec!(30), "x", (9, 1))];
+        let months = YearMonth::new(2026, 9).unwrap().last_n(3);
+        let got: Vec<_> = monthly_summaries(&rows, &months).into_iter().map(|(m, s)| (m.month, s.income.0, s.expense.0)).collect();
+        assert_eq!(got, [(7, dec!(0), dec!(0)), (8, dec!(100), dec!(0)), (9, dec!(0), dec!(30))]);
     }
 
     #[test]

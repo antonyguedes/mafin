@@ -27,6 +27,11 @@ tauri-build = { version = "2.6", features = [] }
 # Sem `any`/`json`; somente SQLite (libsqlite3 embutida) com macros de checagem em compilação.
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "sqlite", "macros", "migrate", "chrono"] }
 tokio = { version = "1", features = ["macros", "rt"] }
+# Importação de notas de corretagem (PDF).
+pdf-extract = "0.12"
+lopdf = { version = "0.42", default-features = false }
+regex = "1"
+base64 = "0.23"
 
 # Frontend (Wasm)
 leptos = { version = "0.8", features = ["csr"] }

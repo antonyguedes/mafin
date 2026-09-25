@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM payouts WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "e86c96e4c55d07ee5d42939aecd7b528e6f2ee1fce70a056b22fd88e99784ef5"
+}

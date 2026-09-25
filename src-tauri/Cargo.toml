@@ -24,6 +24,20 @@ rust_decimal.workspace = true
 chrono.workspace = true
 thiserror.workspace = true
 sqlx.workspace = true
+pdf-extract.workspace = true
+regex.workspace = true
+base64.workspace = true
+# Descriptografa PDFs protegidos antes do pdf-extract (ver `import::extract_pages`) e gera
+# as notas sintéticas dos testes.
+lopdf.workspace = true
+
+[features]
+# Expõe o gerador de notas sintéticas para o exemplo `note_fixture` (testes E2E).
+test-support = []
+
+[[example]]
+name = "note_fixture"
+required-features = ["test-support"]
 
 [dev-dependencies]
 tokio.workspace = true

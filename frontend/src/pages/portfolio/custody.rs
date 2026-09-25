@@ -4,7 +4,8 @@ use shared::rust_decimal::Decimal;
 use shared::{AllocationSlice, AssetType, Position};
 
 use super::{PortfolioState, Tab};
-use crate::components::allocation::{AllocationBar, asset_type_color};
+use crate::components::allocation::{AllocationChart, asset_type_color, slices_by_ticker};
+use crate::components::chart::DonutWithLegend;
 use crate::components::page::{Card, ErrorBanner, StatCard};
 use crate::components::table::{ROW, TABLE_CARD, TD, TH};
 
@@ -30,10 +31,19 @@ pub(super) fn CustodyTab(state: PortfolioState) -> impl IntoView {
         </div>
 
         <Show when=move || !allocation.with(Vec::is_empty)>
-            <Card class="mb-6">
-                <h2 class="mb-4 text-sm font-semibold">"Alocação por tipo"</h2>
-                <AllocationBar slices=allocation />
-            </Card>
+            <div class="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <Card>
+                    <h2 class="mb-4 text-sm font-semibold">"Alocação por tipo"</h2>
+                    <AllocationChart allocation />
+                </Card>
+                <Card>
+                    <h2 class="mb-4 text-sm font-semibold">"Alocação por ativo"</h2>
+                    <DonutWithLegend
+                        slices=Signal::derive(move || positions.with(|p| slices_by_ticker(p)))
+                        label="Alocação por ativo"
+                    />
+                </Card>
+            </div>
         </Show>
 
         <section class=TABLE_CARD>

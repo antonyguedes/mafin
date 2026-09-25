@@ -1,10 +1,16 @@
 mod commands;
 mod db;
 mod error;
+mod import;
+
+/// Gerador de notas sintéticas e prévia sem banco, expostos só para o exemplo `note_fixture`
+/// (fixtures dos testes E2E).
+#[cfg(feature = "test-support")]
+pub use import::{preview_offline as import_preview_offline, testpdf as import_testpdf};
 mod ledger;
 mod repo;
 
-use commands::{assets, orders, tax, transactions};
+use commands::{assets, import as note_import, orders, payouts, tax, transactions};
 use tauri::Manager;
 
 pub fn run() {
@@ -39,7 +45,16 @@ pub fn run() {
             orders::update_order,
             orders::delete_order,
             orders::get_portfolio,
+            payouts::create_payout,
+            payouts::list_payouts,
+            payouts::update_payout,
+            payouts::delete_payout,
+            note_import::parse_broker_note,
+            note_import::import_broker_notes,
+            note_import::list_imported_notes,
+            note_import::undo_imported_note,
             tax::get_tax_report,
+            tax::set_monthly_irrf,
         ])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar a aplicação Tauri");

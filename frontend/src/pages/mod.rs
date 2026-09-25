@@ -1,5 +1,5 @@
 mod dashboard;
-mod expenses;
+pub(crate) mod expenses;
 mod not_found;
 mod portfolio;
 mod tax;

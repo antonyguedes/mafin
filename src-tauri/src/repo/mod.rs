@@ -6,7 +6,10 @@
 //! e `AS "col!"` força não-nulo onde a inferência do SQLite é conservadora.
 
 pub mod assets;
+pub mod irrf;
+pub mod notes;
 pub mod orders;
+pub mod payouts;
 pub mod transactions;
 
 use crate::error::AppError;

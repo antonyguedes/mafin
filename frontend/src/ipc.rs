@@ -143,3 +143,60 @@ pub async fn get_portfolio() -> Result<Portfolio, String> {
 pub async fn get_tax_report() -> Result<shared::tax::TaxReport, String> {
     invoke(commands::GET_TAX_REPORT, &NoArgs {}).await
 }
+
+#[derive(Serialize)]
+struct IrrfArgs {
+    month: shared::YearMonth,
+    amount: shared::Money,
+}
+
+pub async fn set_monthly_irrf(month: shared::YearMonth, amount: shared::Money) -> Result<(), String> {
+    invoke(commands::SET_MONTHLY_IRRF, &IrrfArgs { month, amount }).await
+}
+
+// ---- Proventos ------------------------------------------------------------------------
+
+pub async fn list_payouts() -> Result<Vec<shared::Payout>, String> {
+    invoke(commands::LIST_PAYOUTS, &NoArgs {}).await
+}
+
+pub async fn create_payout(input: shared::NewPayout) -> Result<shared::Payout, String> {
+    invoke(commands::CREATE_PAYOUT, &InputArgs { input }).await
+}
+
+pub async fn update_payout(id: i64, input: shared::NewPayout) -> Result<shared::Payout, String> {
+    invoke(commands::UPDATE_PAYOUT, &UpdateArgs { id, input }).await
+}
+
+pub async fn delete_payout(id: i64) -> Result<(), String> {
+    invoke(commands::DELETE_PAYOUT, &IdArgs { id }).await
+}
+
+// ---- Importação de notas de corretagem ------------------------------------------------
+
+#[derive(Serialize)]
+struct ParseNoteArgs {
+    pdf_base64: String,
+    password: Option<String>,
+}
+
+#[derive(Serialize)]
+struct ImportArgs {
+    request: shared::import::ImportRequest,
+}
+
+pub async fn parse_broker_note(pdf_base64: String, password: Option<String>) -> Result<shared::import::ParseResult, String> {
+    invoke(commands::PARSE_BROKER_NOTE, &ParseNoteArgs { pdf_base64, password }).await
+}
+
+pub async fn import_broker_notes(request: shared::import::ImportRequest) -> Result<shared::import::ImportSummary, String> {
+    invoke(commands::IMPORT_BROKER_NOTES, &ImportArgs { request }).await
+}
+
+pub async fn list_imported_notes() -> Result<Vec<shared::import::ImportedNote>, String> {
+    invoke(commands::LIST_IMPORTED_NOTES, &NoArgs {}).await
+}
+
+pub async fn undo_imported_note(id: i64) -> Result<(), String> {
+    invoke(commands::UNDO_IMPORTED_NOTE, &IdArgs { id }).await
+}

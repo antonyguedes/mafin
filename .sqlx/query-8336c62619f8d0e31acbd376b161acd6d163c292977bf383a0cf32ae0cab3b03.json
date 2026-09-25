@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO monthly_irrf (year, month, amount) VALUES (?, ?, ?)\n             ON CONFLICT (year, month) DO UPDATE SET amount = excluded.amount",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "8336c62619f8d0e31acbd376b161acd6d163c292977bf383a0cf32ae0cab3b03"
+}

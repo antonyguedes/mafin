@@ -5,7 +5,7 @@ use leptos::task::spawn_local;
 use shared::chrono::NaiveDate;
 use shared::format::{decimal_to_input, format_brl, format_date_br, format_quantity};
 use shared::rust_decimal::Decimal;
-use shared::{Asset, Money, NewOrder, Order, OrderKind, Quantity};
+use shared::{Asset, Money, NewOrder, Order, OrderKind, Quantity, SaleKind};
 
 use super::{PortfolioState, Tab};
 use crate::components::form::{
@@ -253,7 +253,7 @@ fn OrderForm(state: PortfolioState, editing: RwSignal<Option<Order>>) -> impl In
                 </label>
                 <label class="lg:col-span-1">
                     <span class=LABEL>"Taxas (R$)"</span>
-                    <input class=format!("{INPUT} tabular text-right") inputmode="decimal" autocomplete="off" bind:value=fees />
+                    <input class=format!("{INPUT} tabular text-right") inputmode="decimal" autocomplete="off" aria-label="Taxas" bind:value=fees />
                 </label>
                 <label class="lg:col-span-2">
                     <span class=LABEL>"Data"</span>
@@ -299,9 +299,12 @@ fn OrderRow(
     let is_editing = move || editing.with(|e| e.as_ref().is_some_and(|o| o.id == id));
     let asset = move || state.asset(order.asset_id);
     let total = order_total(order.kind, order.quantity.0, order.price.0, order.fees.0);
-    // Resultado realizado, calculado no backend pelo motor de posição.
-    let result = move || {
-        state.portfolio.with(|p| p.as_ref().and_then(|p| p.sales.iter().find(|s| s.order_id == id).map(|s| s.result.0)))
+    // Resultado realizado (swing + day trade), calculado no backend pelo motor de posição.
+    let result = move || state.portfolio.with(|p| p.as_ref().and_then(|p| p.order_result(id)).map(|m| m.0));
+    let is_day_trade = move || {
+        state.portfolio.with(|p| {
+            p.as_ref().is_some_and(|p| p.sales.iter().any(|s| s.order_id == id && s.kind == SaleKind::DayTrade))
+        })
     };
 
     let (kind_class, kind_label) = match order.kind {
@@ -349,6 +352,14 @@ fn OrderRow(
             <td class=format!("{TD} tabular text-right text-slate-500")>{format_brl(order.fees.0)}</td>
             <td class=format!("{TD} tabular text-right font-medium")>{format_brl(total)}</td>
             <td class=format!("{TD} tabular text-right")>
+                <Show when=is_day_trade>
+                    <span
+                        class="mr-1.5 rounded bg-amber-100 px-1 text-[10px] font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-200"
+                        title="Day trade: compra e venda no mesmo dia e corretora"
+                    >
+                        "DT"
+                    </span>
+                </Show>
                 {move || match result() {
                     Some(r) if r.is_sign_negative() && !r.is_zero() => {
                         view! { <span class="text-red-600 dark:text-red-400">{format_brl(r)}</span> }.into_any()

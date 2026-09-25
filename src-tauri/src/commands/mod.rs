@@ -4,7 +4,9 @@
 //! são iguais aos nomes Rust (`{ id, input }`, `{ filter }`), sem conversão para camelCase.
 
 pub mod assets;
+pub mod import;
 pub mod orders;
+pub mod payouts;
 pub mod tax;
 pub mod transactions;
 
