@@ -1,0 +1,32 @@
+/* Tailwind CSS v4 (configuração CSS-first; sem tailwind.config.js).
+   Compilado pelo Trunk via <link data-trunk rel="tailwind-css"> no index.html. */
+
+/* `source(none)` desliga a detecção automática: só as fontes abaixo são escaneadas. */
+@import "tailwindcss" source(none);
+@source "../src";
+@source "../index.html";
+
+@theme {
+  /* Fontes do sistema: o app é offline, nada de CDN. */
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "JetBrains Mono", "Cascadia Code", Menlo, monospace;
+
+  /* Cor de destaque da marca, usada como `brand-*` nas classes. */
+  --color-brand-50: var(--color-emerald-50);
+  --color-brand-100: var(--color-emerald-100);
+  --color-brand-400: var(--color-emerald-400);
+  --color-brand-500: var(--color-emerald-500);
+  --color-brand-600: var(--color-emerald-600);
+  --color-brand-700: var(--color-emerald-700);
+}
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+
+  /* Números financeiros alinhados em colunas. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}

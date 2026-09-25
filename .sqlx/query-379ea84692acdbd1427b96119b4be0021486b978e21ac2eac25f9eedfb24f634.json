@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!\", kind AS \"kind: TransactionKind\", amount AS \"amount: Money\",\n                  date AS \"date: NaiveDate\", category, description\n           FROM transactions\n           WHERE (?1 IS NULL OR date >= ?1)\n             AND (?2 IS NULL OR date < ?2)\n             AND (?3 IS NULL OR kind = ?3)\n           ORDER BY date DESC, id DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "transactions",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "kind: TransactionKind",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "transactions",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "amount: Money",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "transactions",
+            "name": "amount"
+          }
+        }
+      },
+      {
+        "name": "date: NaiveDate",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "transactions",
+            "name": "date"
+          }
+        }
+      },
+      {
+        "name": "category",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "transactions",
+            "name": "category"
+          }
+        }
+      },
+      {
+        "name": "description",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "transactions",
+            "name": "description"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "379ea84692acdbd1427b96119b4be0021486b978e21ac2eac25f9eedfb24f634"
+}

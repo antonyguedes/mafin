@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO assets (ticker, asset_type, broker)\n           VALUES (?, ?, ?)\n           RETURNING id AS \"id!\", ticker, asset_type AS \"asset_type: AssetType\", broker",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "ticker",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "ticker"
+          }
+        }
+      },
+      {
+        "name": "asset_type: AssetType",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "asset_type"
+          }
+        }
+      },
+      {
+        "name": "broker",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "assets",
+            "name": "broker"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d5e83cfc31241c995980e4de552832c5f1ee9f010f42549dd0c65d415a87894b"
+}

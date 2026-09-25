@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO orders (asset_id, kind, quantity, price, fees, date)\n           VALUES (?, ?, ?, ?, ?, ?)\n           RETURNING id AS \"id!\", asset_id, kind AS \"kind: OrderKind\", quantity AS \"quantity: Quantity\",\n                     price AS \"price: Money\", fees AS \"fees: Money\", date AS \"date: NaiveDate\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "asset_id",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "asset_id"
+          }
+        }
+      },
+      {
+        "name": "kind: OrderKind",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "quantity: Quantity",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "quantity"
+          }
+        }
+      },
+      {
+        "name": "price: Money",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "price"
+          }
+        }
+      },
+      {
+        "name": "fees: Money",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "fees"
+          }
+        }
+      },
+      {
+        "name": "date: NaiveDate",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "orders",
+            "name": "date"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      null,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8fdd6d3e2046237fe2f43a2279f32c244301f343aea37c21fe94ee7e50b72df1"
+}

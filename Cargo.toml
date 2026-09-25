@@ -1,0 +1,47 @@
+[workspace]
+resolver = "3"
+members = ["shared", "src-tauri", "frontend"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+authors = ["antonyguedes"]
+license = "MIT"
+
+# Versões centralizadas: cada membro usa `dep.workspace = true`.
+[workspace.dependencies]
+shared = { path = "shared" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Feature `serde` serializa Decimal como STRING ("10.50"), nunca como float JSON.
+rust_decimal = { version = "1.43", default-features = false, features = ["std", "serde"] }
+rust_decimal_macros = "1.40"
+chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
+thiserror = "2"
+
+# Backend
+tauri = { version = "2.11", features = [] }
+tauri-build = { version = "2.6", features = [] }
+# Sem `any`/`json`; somente SQLite (libsqlite3 embutida) com macros de checagem em compilação.
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "sqlite", "macros", "migrate", "chrono"] }
+tokio = { version = "1", features = ["macros", "rt"] }
+
+# Frontend (Wasm)
+leptos = { version = "0.8", features = ["csr"] }
+leptos_router = "0.8"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+serde-wasm-bindgen = "0.6"
+console_error_panic_hook = "0.1"
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
+
+# O Wasm do frontend prioriza tamanho (carregado a cada abertura do app).
+[profile.release.package.frontend]
+opt-level = "z"

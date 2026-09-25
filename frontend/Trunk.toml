@@ -1,0 +1,18 @@
+[build]
+target = "index.html"
+dist = "dist"
+
+[tools]
+# O Trunk baixa o executável standalone do Tailwind (sem Node/npm) e o guarda em cache.
+tailwindcss = "4.3.3"
+
+[watch]
+# Recompila o Wasm também quando os tipos compartilhados mudam.
+watch = [".", "../shared"]
+ignore = ["dist"]
+
+[serve]
+# Precisa bater com `build.devUrl` em src-tauri/tauri.conf.json.
+addresses = ["127.0.0.1"]
+port = 1420
+open = false

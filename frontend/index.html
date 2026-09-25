@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="pt-BR" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mafin</title>
+    <link data-trunk rel="tailwind-css" href="style/main.css" />
+    <!-- wasm-opt (só no build --release) precisa das features que o Rust já emite por padrão. -->
+    <link
+      data-trunk
+      rel="rust"
+      data-wasm-opt="z"
+      data-wasm-opt-params="--enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext --enable-mutable-globals --enable-reference-types --enable-multivalue"
+    />
+  </head>
+  <body class="h-full bg-slate-50 font-sans text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100"></body>
+</html>

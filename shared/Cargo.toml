@@ -1,0 +1,21 @@
+[package]
+name = "shared"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[features]
+# Ativada só pelo backend: implementa os traits do sqlx para os tipos daqui.
+# O frontend (Wasm) nunca compila sqlx.
+sqlx = ["dep:sqlx"]
+
+[dependencies]
+serde.workspace = true
+rust_decimal.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+sqlx = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true
+rust_decimal_macros.workspace = true
